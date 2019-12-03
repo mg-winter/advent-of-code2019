@@ -35,13 +35,4 @@ function calculate_from_file_compounded($path) {
     return calculate_fuel_compounded_all(array_map('intval', explode(PHP_EOL, $str)));
 }
 
-echo 'Simple';
-echo PHP_EOL;
-echo calculate_from_file($argv[1]);
-echo PHP_EOL;
-echo 'Compounded';
-echo PHP_EOL;
-echo calculate_from_file_compounded($argv[1]);
-echo PHP_EOL;
-
 ?>
