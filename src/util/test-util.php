@@ -1,4 +1,6 @@
 <?php 
+require_once 'util.php';
+
     function run_simple_test($test, $func_to_test) {
         $res = call_user_func_array($func_to_test, $test['input']);
 
@@ -15,31 +17,6 @@
         return array_map($runner, $tests);
     }
 
-    //https://stackoverflow.com/a/173479
-    function is_associative($arr) {
-        return isset($arr) && array_keys($arr) === range(0, count($arr) - 1);
-    }
-
-    function format_array($val) {
-        if (is_array($val)) {
-            $inner = '';
-            if (is_associative($arr)) {
-                $keys = array_keys($val);
-                $stringifier = function($key) use ($val) {
-                    return $key . ' => '. format_array($val[$key]);
-                };
-
-                $strings = array_map($stringifier, $keys);
-                $inner = implode(', ',  $strings);
-            } else {
-                $inner = implode(',', $val);
-            }
-            return '[' . $inner . ']';
-            
-        } else {
-            return $val;
-        }
-    }
 
     function format_result($result) {
         $pass_str = $result['pass'] ? 'pass' : 'fail';

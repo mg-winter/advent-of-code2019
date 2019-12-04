@@ -65,7 +65,8 @@ function mult($a, $b) {
     return $a * $b;
 }
 
-function process_intcode_arr($arr) {
+
+function process_intcode_arr($arr, $is_debug) {
     $functions = ['1' => 'calculate_add', '2' => 'calculate_mult', '99' => 'halt' ];
     $res = ['result' => $arr, 'next_index' => 0, 'halt' => false];
     $arr_length = count($arr);
@@ -81,37 +82,94 @@ function process_intcode_arr($arr) {
             throw new Exception('Unknown code: ' + $cur_code);
         }
  
-        $res = call_user_func_array($cur_func, [$cur_arr, $cur_index]); 
-        echo $res['desc'] . PHP_EOL;
+        $res = call_user_func_array($cur_func, [$cur_arr, $cur_index]);
+        if ($is_debug) { 
+            echo $cur_index . ': '. $res['desc'] . PHP_EOL;
+        }
     }
 
     return $res['result'];
 }
 
-function process_intcode_from_file($path) {
+function process_intcode_from_file($path, $is_debug) {
     $str = file_get_contents($path);
-    return implode(',', process_intcode_arr(explode(',', $str)));
+    return implode(',', process_intcode_arr(explode(',', $str), $is_debug));
 }
 
-function try_substitute_intcode_from_file($path, $pos1, $pos2) {
+function try_substitute_intcode_from_file($path, $pos1, $pos2, $is_debug) {
+
     $str = file_get_contents($path);
     $arr = explode(',', $str);
     $arr[1] = $pos1;
     $arr[2] = $pos2;
     
-    return implode(',', process_intcode_arr($arr));
-    
+    return process_intcode_arr($arr, $is_debug);
 }
 
 
+/**If difference is even, returns exact midpoint. Otherwise,
+ * returns the higher midpoint.
+ */
+function get_midpoint($min, $max) {
+    $diff = $max - $min;
+
+    return $min + (intdiv($diff, 2)  + ($diff % 2));
+}
+
+function seek_result_in_range($test_func, $min_desired, $max_desired, $min_val, $max_val, $is_debug) {
+    $cur_min = $min_val;
+    $cur_max = $max_val;
+
+    $res_range = ['options' => ['min_range' => $min_desired, 'max_range' => $max_desired]];
+    do {
+        $cur_val = get_midpoint($cur_min, $cur_max);
+        
+        if ($is_debug) {
+            echo 'Try ' . $cur_val . ' to get within range ' 
+                    . $min_desired . ',' . $max_desired;
+            echo PHP_EOL;
+        }
+
+        $res = call_user_func_array($test_func, [$cur_val]);
+        if (filter_var($res, FILTER_VALIDATE_INT, $res_range)) {
+            return ['has_solution' => true, 'input' => $cur_val, 'result' => $res];
+        } else if ($res < $min_desired) {
+            $cur_min = $cur_val + 1;
+        } else {
+            $cur_max = $cur_val - 1;
+        }
+    } while ($cur_min <= $cur_max);
+
+    return ['has_solution' => false];
+}
+
 /**
  * 
- * Algorithm for part 2:
- * It is important that position 1 has big impact (gets multiplied a lot), and position 2
- * just gets added to position 1 at the end.  So, instead of a brute force search, we should
- * get position 1 within the range of (desired value -99, desired value) and use position
- * 2 to adjust the difference
  * 
- * Then use binary search to arrive at final result.
+ * It is important that position 1 has big impact (gets multiplied a lot), and position 2
+ * just gets added to position 1 at the end.  If we can
+ * use position 1 to get within the range of (desired value -99, desired value), we can then
+ * use position 2 to adjust the difference
+ * 
  */
+function seek_intcode_result_in_file($path, $desired_result, $is_debug) {
+    
+    $MIN_CODE = 0;
+    $MAX_CODE = 99;
+
+    $tester = function($pos1) use ($path, $is_debug) {
+        return try_substitute_intcode_from_file($path, $pos1, $MIN_CODE, $is_debug)[0];
+    };
+
+    $seek_result = seek_result_in_range($tester, 
+                                            $desired_result - $MAX_CODE + $MIN_CODE, 
+                                            $desired_result - $MIN_CODE, 
+                                            $MIN_CODE, $MAX_CODE, $is_debug);
+    
+    return $seek_result['has_solution'] ? ['has_solution' => true, 
+                        'pos1' => $seek_result['input'],
+                        'pos2' => $desired_result - $seek_result['result']] 
+                    : $seek_result;
+}
+
 ?>
