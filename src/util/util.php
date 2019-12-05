@@ -16,13 +16,13 @@
 
      //https://stackoverflow.com/a/173479
      function is_associative($arr) {
-        return isset($arr) && array_keys($arr) === range(0, count($arr) - 1);
+        return isset($arr) && array_keys($arr) !== range(0, count($arr) - 1);
     }
 
     function format_array($val) {
         if (is_array($val)) {
             $inner = '';
-            if (is_associative($arr)) {
+            if (is_associative($val)) {
                 $keys = array_keys($val);
                 $stringifier = function($key) use ($val) {
                     return $key . ' => '. format_array($val[$key]);
