@@ -7,4 +7,9 @@ echo PHP_EOL;
 echo find_intersections_from_file($argv[1], $is_debug_argv);
 echo PHP_EOL;
 
+echo 'Part 2';
+echo PHP_EOL;
+echo find_intersections_by_steps_from_file($argv[1], $is_debug_argv);
+echo PHP_EOL;
+
 ?>

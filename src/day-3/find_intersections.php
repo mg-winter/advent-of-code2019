@@ -169,7 +169,7 @@ abstract class Shape {
     abstract public function get_grid_area();
     abstract public function crop($grid_area);
 
-    private static function get_intersection($shape1, $shape2) {
+    protected static function get_intersection($shape1, $shape2) {
         if ($shape1 === null || $shape2 === null) {
             return null;
         }
@@ -180,30 +180,30 @@ abstract class Shape {
         return $intersect_area;
     }
 
-    
-
-    public static function find_nearest_intersection_distance($shape1, $shape2) {
+    public static function find_intersections($shape1, $shape2) {
         $intersection = self::get_intersection($shape1, $shape2);
         if ($intersection === null) {
-            return -1;
+            return [];
         } else if ($intersection->get_area() === 1) {
             $distance = $intersection->get_manhattan_distance();
-            return $distance === 0 ? -1 : $distance;
+            
+            return $distance === 0 ? [] : [$intersection];
         } else {
             $areas = $intersection->split();
             $results = array_map(function($area) use ($shape1, $shape2) {
-                return self::find_nearest_intersection_distance
-        ($shape1->crop($area), 
-                                                        $shape2->crop($area));
+                return self::find_intersections
+                    ($shape1->crop($area), $shape2->crop($area));
             }, $areas);
 
-            $valid_results = array_filter($results, function($num) {
-                return $num > 0;
-            });
-
-            return count($valid_results) > 0 ? min($valid_results) : -1;
-            
+            return  call_user_func_array('array_merge', $results);         
         }
+    }
+
+    public static function find_nearest_intersection_distance($shape1, $shape2) {
+        $intersections = self::find_intersections($shape1, $shape2);
+        return min(array_map(function($area) {
+                return $area->get_manhattan_distance();
+            }, $intersections));
                                                    
 
     }
@@ -237,17 +237,17 @@ class Vertex extends Shape {
     }
 }
 class Line extends Shape {
-    public $Vertex1 = null;
-    public $Vertex2 = null;
+    public $From_Vertex = null;
+    public $To_Vertex = null;
 
-    public function __construct($vertex1, $vertex2) {
-        $this->Vertex1 = $vertex1;
-        $this->Vertex2 = $vertex2;
+    public function __construct($from_vertex, $to_vertex) {
+        $this->From_Vertex = $from_vertex;
+        $this->To_Vertex = $to_vertex;
     }
 
     public function get_grid_area() {
-        return Grid_Area::union($this->Vertex1->get_grid_area(), 
-                                    $this->Vertex2->get_grid_area());
+        return Grid_Area::union($this->From_Vertex->get_grid_area(), 
+                                    $this->To_Vertex->get_grid_area());
     }
 
     public function crop($grid_area) {
@@ -258,7 +258,7 @@ class Line extends Shape {
     }
 
     public function __toString() {
-        return $this->Vertex1 . '<->' . $this->Vertex2;
+        return $this->From_Vertex . '<->' . $this->To_Vertex;
     }
 
     public static function create_line_from_delta($vertex, $delta) {
@@ -300,16 +300,49 @@ class Path extends Shape {
         return count($valid_lines) > 0 ? new Path($valid_lines) : null;
     }
 
+    /** This could be optimized by caching the up-to-here distance calculation 
+     * for full lines, as well as checking just the intersected lines,
+     * but then we'd have to deal with read-only properties, which is a pain in PHP */
+    public function calculate_distance($intersect_area) {
+       
+        $distance = 0;
+        foreach ($this->Lines as $line) {
+            $intersect = Grid_Area::intersect($line->get_grid_area(), $intersect_area);
+            if ($intersect === null) {
+                $distance += $line->get_grid_area()->get_area() - 1;
+                
+            } else {
+                $segment_area = Grid_Area::union($line->From_Vertex->get_grid_area(), $intersect);
+               
+                return $distance + $segment_area->get_area();
+            }
+        }
+        return -1;
+    }
+
     public static function create_path_from_deltas($origin, $deltas) {
         $last_origin = $origin;
         $lines = [];
         foreach ($deltas as $delta) {
             $line = Line::create_line_from_delta($last_origin, $delta);
             array_push($lines, $line);
-            $last_origin = $line->Vertex2;
+            $last_origin = $line->To_Vertex;
         }
 
         return new Path($lines);
+    }
+
+    public static function find_nearest_intersection_steps($path1, $path2) {
+        $intersections = self::find_intersections($path1, $path2);
+       
+        $min_by_distance = function($cur_min, $item) use ($path1, $path2) {
+            $new_min1 = $path1->calculate_distance($item);
+            $new_min2 = $path2->calculate_distance($item);
+            $new_min = $new_min1 + $new_min2;
+            return $cur_min > 0 ? min($cur_min, $new_min) : $new_min;
+        };
+        $min_distance = array_reduce($intersections, $min_by_distance, -1);
+        return $min_distance;
     }
 
     public function __toString() {
@@ -318,24 +351,38 @@ class Path extends Shape {
 }
 
 
-function find_intersections_arr($arrs, $is_debug) {
-    $delta_sets = array_map(function($arr) {
+function convert_to_shapes($arrs) {
+    return  array_map(function($arr) {
         $delta_arr = Delta::parse_deltas($arr);
         $delta_arr[0]->shave_start();
         $vector = $delta_arr[0]->Vector;
         $origin = new Vertex($vector[0], $vector[1]);
         return Path::create_path_from_deltas($origin, $delta_arr);
     }, $arrs);
+}
 
 
-    return Shape::find_nearest_intersection_distance($delta_sets[0], $delta_sets[1]);
+function get_arrs($path) {
+    $str = file_get_contents($path);
+    $wires = explode(PHP_EOL, $str);
+    return array_map(function($str_arr){return explode(',',$str_arr);}, $wires);
+}
+function find_intersections_arr($arrs, $is_debug) {
+    $shapes = convert_to_shapes($arrs);
+    return Shape::find_nearest_intersection_distance($shapes[0], $shapes[1]);
 }
 
 function find_intersections_from_file($path, $is_debug) {
-    $str = file_get_contents($path);
-    $wires = explode(PHP_EOL, $str);
-    $arrs = array_map(function($str_arr){return explode(',',$str_arr);}, $wires);
-    return find_intersections_arr($arrs, $is_debug);
+    return find_intersections_arr(get_arrs($path), $is_debug);
+}
+
+function find_intersections_by_steps_arr($arrs, $is_debug) {
+    $shapes = convert_to_shapes($arrs);
+    return Path::find_nearest_intersection_steps($shapes[0], $shapes[1]);
+}
+
+function find_intersections_by_steps_from_file($path, $is_debug) {
+    return find_intersections_by_steps_arr(get_arrs($path), $is_debug);
 }
 
 
