@@ -24,19 +24,17 @@ function int_pow($base, $power) {
 
 function get_passwords_recursive($num_so_far, $digit_to_add, $remaining_digits, $max_num) {
  
-    echo $num_so_far . '<-' .  $digit_to_add . ' ('. $remaining_digits . ' )'. PHP_EOL;
+    
     $num = $num_so_far * 10 + $digit_to_add;   
-    $has_repeat = preg_match('/(\d)\\1/', $num);
+   
     $comparison_num = $num * int_pow(10, $remaining_digits);                                                               
     if ($comparison_num  > $max_num) {
         return [];
     } else if ($remaining_digits <= 0) {
-        echo $num . PHP_EOL;
-        return $has_repeat ? [$num] : [];
+        return [$num];
     } else {
-        $next_digits = ($has_repeat || $remaining_digits >= 1)  ? range($digit_to_add, 9) 
-                                                        : [$digit_to_add];
-        
+        $next_digits =  range($digit_to_add, 9);
+                                                  
         $recurse = function($digit) use ($num, $digit_to_add, $remaining_digits, $max_num) {                                                                                                       
             return get_passwords_recursive($num, $digit, $remaining_digits - 1,  $max_num);                                                            
         };                                     
@@ -45,51 +43,29 @@ function get_passwords_recursive($num_so_far, $digit_to_add, $remaining_digits, 
 }
 
 function get_min_digit_arr($digits) {
-    $prev_digit = $digits[0];
+    
     $has_repeat = false;
     $num_digits = count($digits);
-    $repeat_index = -1;
-
+   
     for ($i = 1; $i < $num_digits; $i++) {
-        if ($digits[$i] < $prev_digit) {
+        if ($digits[$i] < $digits[$i-1]) {
             for ($j = $i; $j < $num_digits; $j++) {
-                $digits[$j] = $prev_digit;
+                $digits[$j] = $digits[$i-1];
             }
-            $repeat_index = $i;
             break;
-        } else {
-            if ($repeat_index === -1 &&  $prev_digit === $digits[$i]) {
-                $repeat_index = $i;
-            }
-            $prev_digit = $digits[$i];
-        }  
-        
-    }
-
-    if ($repeat_index < 1) {
-        for ($i = $num_digits - 2; $i > 0; $i++) {
-            if ($digits[$i] < 9) {
-                $digits[$i] = $digits[$i] + 1;
-                $repeat_index = $i+1;
-                for ($j = $repeat_index; $j < $num_digits; $j++) {
-                    $digits[$j] = $digits[$i];
-                }
-                break;
-            }
         }
     }
     return $digits;
 }
 
-
 function get_passwords_from($digits_array, $set_length, $max_num) {
     $next_numbers = range($digits_array[$set_length]+1, 9);
-    echo format_array($next_numbers) . PHP_EOL;
+
     $remaining_digits = count($digits_array) - $set_length - 1;
     $num_so_far = array_to_num(array_slice($digits_array, 0, $set_length));
-    echo $num_so_far . ' - ' . $remaining_digits . PHP_EOL;
+
     $pw_results = array_map(function($digit) use ($num_so_far, $remaining_digits, $max_num) {
-        echo $digit . PHP_EOL;
+
         return get_passwords_recursive($num_so_far, $digit, $remaining_digits, $max_num);
     }, $next_numbers);
 
@@ -122,11 +98,11 @@ function get_full_passwords($min_digits, $max_num) {
         return get_passwords_recursive(0, $digit, $digits_to_generate, $max_num);
     }, $digits);
 
-    return call_user_func_array('array_merge', $pw_results);
+    return count($pw_results) > 0 ? call_user_func_array('array_merge', $pw_results) : [];
 }
 
 
-function get_passwords($min, $max) {
+function get_passwords_filtered($min, $max, $filter_func) {
     $digits = str_split($min);
     $min_digits = get_min_digit_arr($digits);
     $num_digits = count($min_digits);
@@ -138,8 +114,25 @@ function get_passwords($min, $max) {
 
     $full_sets = get_full_passwords($min_digits, $max);
 
-    //echo count(call_user_func_array('array_merge', $partial_sets)) . ' + '. count(call_user_func_array('array_merge', $full_sets)) .  ' + 1' . PHP_EOL;
-    return array_merge([$min_valid_num], $partial_sets, $full_sets);
+    return array_filter(array_merge([$min_valid_num], $partial_sets, $full_sets), $filter_func);
+}
+
+function get_passwords($min, $max) {
+    return get_passwords_filtered($min, $max, function($num) {
+        return preg_match('/(\d)\1/', $num);
+    });
+}
+
+function get_passwords_b($min, $max) {
+    $regexes = array_map(function($digit) {
+        return '/(^|[^' . $digit . '])(' . $digit . '){2}(?!\2)/';
+    },range(1,9));
+
+    return get_passwords_filtered($min, $max, function($num) use ($regexes) {
+        return count(array_filter($regexes,  function($regex) use ($num) {
+            return preg_match($regex, $num);
+        })) > 0;
+    });
 }
 
 
