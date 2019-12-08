@@ -3,15 +3,6 @@
 require_once '../util/util.php';
 
 
-function check_prev_orbits(&$orbit_counts, &$orbit_refs, $center) {
-    if (isset($orbit_refs[$center])) {
-        $orbit_counts[$center]++;
-        foreach ($orbit_refs[$center] as $ref) {
-            check_prev_orbits($orbit_counts, $orbit_refs, $ref);
-        }
-    }
-}
-
 
 function count_subpaths(&$orbit_refs, &$orbit_counts, $key) {
     if (isset($orbit_refs[$key])) {
@@ -30,8 +21,8 @@ function count_subpaths(&$orbit_refs, &$orbit_counts, $key) {
     }
     return isset($orbit_refs[$key]) ? 1 + count_subpaths($orbit_refs, $orbit_refs[$key]) : 0;
 }
-function count_orbits($orbits) {
-    $orbit_counts = ['COM' => 0];
+
+function get_orbits($orbits) {
     $orbit_refs = [];
     foreach ($orbits as $orbit) { 
         $exploded = explode(')', $orbit);
@@ -41,6 +32,13 @@ function count_orbits($orbits) {
 
         $orbit_refs[$orbiting] = $center;
     }
+
+    return $orbit_refs;
+}
+
+function count_orbits($orbits) {
+    $orbit_counts = ['COM' => 0];
+    $orbit_refs = get_orbits($orbits);
     $num_connections = 0;
     foreach ($orbit_refs as $key =>  $value) {
         $num_connections += count_subpaths($orbit_refs, $orbit_counts, $key);
@@ -48,9 +46,55 @@ function count_orbits($orbits) {
     return $num_connections;
 }
 
+function get_distance($orbits, $from, $to) {
+    $orbit_refs = get_orbits($orbits);
+
+    $endpoints = [$orbit_refs[$from], $orbit_refs[$to]];
+    $paths = [[$endpoints[0] => 0], [$endpoints[1] => 0]];
+
+    $cur_index = 0;
+    $other_index = 1;
+    $distance = 0;
+
+    while (isset($endpoints[0]) && isset($endpoints[1])) {
+
+        $cur_center =  $endpoints[$cur_index];
+        $next_center =  $orbit_refs[$cur_center];
+
+        $cur_distance = $paths[$cur_index][$cur_center];
+
+        if (isset($paths[$other_index][$cur_center])) {
+
+            return $paths[$other_index][$cur_center] + $cur_distance;
+        }
+
+        $endpoints[$cur_index] = $next_center;
+
+        if (isset($next_center)) {
+            $paths[$cur_index][$next_center]  = $cur_distance + 1;
+        }
+
+        if (isset($endpoints[$other_index])) {
+            $temp  = $cur_index;
+            $cur_index = $other_index;
+            $other_index = $temp;
+        }
+        
+        $distance++;
+    }
+
+
+    return -1;
+}
+
 function count_orbits_from_file($path) {
     $str = file_get_contents($path);
     return count_orbits(explode(PHP_EOL, $str));
+}
+
+function get_distance_from_file($path, $from, $to) {
+    $str = file_get_contents($path);
+    return get_distance(explode(PHP_EOL, $str), $from, $to);
 }
 
 ?>
