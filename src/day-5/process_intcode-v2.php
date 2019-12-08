@@ -26,6 +26,7 @@ class Cached_Output extends Output {
     private $Storage = [];
 
     public function write($value) {
+        echo 'Value is ' . $value;
         return array_push($this->Storage, $value) - 1;
     }
 
@@ -38,7 +39,9 @@ class Cached_Output extends Output {
     }
 
     public function __toString() {
-        return implode(PHP_EOL, $this->Storage);
+        return implode(PHP_EOL, array_map(function($line) {
+            return $line . '';
+        },$this->Storage));
     }
 }
 
@@ -51,17 +54,26 @@ function check_index($arr, $index, $index_desc) {
     }
 }
 
-function get_value($arr, $index, $mode) {
+function get_value($arr, $base_index, $offset, $modes) {
     
+    $index = $base_index + $offset;
+    $mode = $modes[$offset-1];
+
     check_index($arr, $index, 'parameter address (mode "' . $mode . '")');
     $val = $arr[$index];
-    return isset($mode) && $mode == 1 ? $val : get_value($arr, $val, 1);
+
+    if (isset($mode) && $mode == 1) {
+        return $val;
+    } else {
+        check_index($arr, $val, 'parameter address (referenced from "' . $index . '")');
+        return $arr[$val];
+    }
 }
 
-function get_values($arr, $first_arg_index, $num_params, $modes) {
-    return array_map(function($index) use ($arr, $first_arg_index, $modes) {
-        return get_value($arr, $first_arg_index + $index, $modes[$index]);
-    }, range(0, $num_params - 1));
+function get_values($arr, $base_index, $num_params, $modes) {
+    return array_map(function($offset) use ($arr, $base_index, $modes) {
+        return get_value($arr, $base_index, $offset, $modes);
+    }, range(1, $num_params));
 }
 function calculate($arr, $index, $modes, $num_params, $calc_func, $io) {
 
@@ -73,7 +85,7 @@ function calculate($arr, $index, $modes, $num_params, $calc_func, $io) {
     $output_index = $arr[$output_slot];
     check_index($arr, $output_index, 'output index');
 
-    $args = get_values($arr, $index + 1, $num_params, $modes);
+    $args = get_values($arr, $index, $num_params, $modes);
 
     $arr[$output_index] = call_user_func_array($calc_func, $args);
     return ['result' => $arr, 'next_index' => $output_slot + 1, 'halt' => false, 
@@ -93,6 +105,14 @@ function calculate_mult($arr, $index, $modes, $io) {
     return calculate_binary($arr, $index, $modes, 'mult', $io);
 }
 
+function calculate_less_than($arr, $index, $modes, $io) {
+    return calculate_binary($arr, $index, $modes, 'less_than', $io);
+}
+
+function calculate_equals($arr, $index, $modes, $io) {
+    return calculate_binary($arr, $index, $modes, 'equals', $io);
+}
+
 function save_input($arr, $index, $modes, $io) {
     $input = $io['input']->read();
     check_index($arr, $index+1, 'output slot');
@@ -103,11 +123,30 @@ function save_input($arr, $index, $modes, $io) {
     'desc' => 'saved ' . $input . ' into position ' . $output_index];
 }
 
+function jump_if_true($arr, $index, $modes, $io) {
+    return jump_if($arr, $index, 2, $modes, 3, 
+                        0 != get_value($arr, $index, 1, $modes));
+}
+
+function jump_if_false($arr, $index, $modes, $io) {
+    return jump_if($arr, $index, 2, $modes, 3, 
+                        0 == get_value($arr, $index, 1, $modes));
+}
+
+function jump_if($arr, $index, $jump_val_offset, $modes, $slots_to_skip, $is_jump) {
+
+    $next_index = $is_jump ? get_value($arr, $index, $jump_val_offset, $modes) 
+                : $index + $slots_to_skip;
+    return ['result' => $arr, 'next_index' => $next_index, 'halt' => false, 
+    'desc' => $is_jump ? 'jump to ' . $next_index : 'continue to ' . $next_index];
+}
+
+
 function output($arr, $index, $modes, $io) {
     $output = $io['output'];
     $val_index = $index + 1;
 
-    $val_to_output = get_value($arr, $val_index, $modes[0]);
+    $val_to_output = get_value($arr, $index, 1, $modes);
     
     $output_res = $output->write($val_to_output);
 
@@ -128,12 +167,24 @@ function mult($a, $b) {
     return $a * $b;
 }
 
+function less_than($a, $b) {
+    return $a < $b;
+}
+
+function equals($a, $b) {
+    return $a == $b;
+}
+
 
 function process_intcode_arr($arr, $input, $output, $is_debug) {
     $functions = ['01' => 'calculate_add', 
                     '02' => 'calculate_mult', 
                     '03' => 'save_input',
                     '04' => 'output',
+                    '05' => 'jump_if_true',
+                    '06' => 'jump_if_false',
+                    '07' => 'calculate_less_than',
+                    '08' => 'calculate_equals',
                     '99' => 'halt' ];
     $res = ['result' => $arr, 'next_index' => 0, 'halt' => false];
     $arr_length = count($arr);
@@ -158,10 +209,12 @@ function process_intcode_arr($arr, $input, $output, $is_debug) {
 
         $modes = $opcode_pos > 0 ? array_reverse(str_split(substr($cur_code, 0, $opcode_pos))) 
                             : [];
-
+        if ($is_debug) {
+            echo $cur_index . ' (' . $cur_func . ')';
+        }
         $res = call_user_func_array($cur_func, [$cur_arr, $cur_index, $modes, $io]);
         if ($is_debug) { 
-            echo $cur_index . '(' . $cur_func . ')' . ': '. $res['desc'] . PHP_EOL;
+            echo ': '. $res['desc'] . PHP_EOL;
         }
     }
 
