@@ -8,7 +8,7 @@ echo PHP_EOL;
 
 echo 'Part 2';
 echo PHP_EOL;
-//echo 
+echo format_array(test_amplifiers_cycle_from_file('/Users/Ria/Code/advent-of-code2019/data/day-7.txt',true));
 echo PHP_EOL;
 
 

@@ -57,7 +57,7 @@ function check_index($arr, $index, $index_desc) {
 function get_value($arr, $base_index, $offset, $modes) {
     
     $index = $base_index + $offset;
-    $mode = $modes[$offset-1];
+    $mode = isset($modes[$offset-1]) ? $modes[$offset-1] : 0;
 
     check_index($arr, $index, 'parameter address (mode "' . $mode . '")');
     $val = $arr[$index];
@@ -210,7 +210,7 @@ function process_intcode_arr($arr, $input, $output, $is_debug) {
         $modes = $opcode_pos > 0 ? array_reverse(str_split(substr($cur_code, 0, $opcode_pos))) 
                             : [];
         if ($is_debug) {
-            echo $cur_index . ' (' . $cur_func . ')';
+            echo PHP_EOL . $cur_index . ' (' . $cur_func . ')';
         }
         $res = call_user_func_array($cur_func, [$cur_arr, $cur_index, $modes, $io]);
         if ($is_debug) { 
