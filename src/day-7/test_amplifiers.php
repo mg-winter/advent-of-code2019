@@ -3,6 +3,13 @@
 require_once '../util/util.php';
 require_once '../day-5/process_intcode-v2.php';
 
+/**To use multithreading, PHP must be recompiled  with zts enabled
+ * and the pthreads extension added. Instructions: 
+ * https://medium.com/@rossbulat/true-php7-multi-threading-how-to-rebuild-php-and-use-pthreads-bed4243c0561
+ * 
+ * Another option would be to build a Javascript-style tick-based interpreter for Intcode,
+ * but that is too much for a part b.
+ */
 class Connected_Input_Output extends Volatile {
     private $Lines = [];
     private $ID;
@@ -13,18 +20,18 @@ class Connected_Input_Output extends Volatile {
         $this->Line_Pointer = 0;
     }
 
-    /**I am not entirely sure why synchronized seems to be required on
-     * write but not on read.
-     */
-    public function read() {  
-            $val = $this->Lines[$this->Line_Pointer];
-            while (!isset($val)) {
-                $this->wait();
-                $val = $this->Lines[$this->Line_Pointer];
-            }
 
-            $this->Line_Pointer++;
+    public function read() {  
+        $res = $this->synchronized(function($thread) {
+            $val = $thread->Lines[$this->Line_Pointer];
+            while (!isset($val)) {
+                $thread->wait();
+                $val = $thread->Lines[$this->Line_Pointer];
+            }
+            $thread->Line_Pointer++;
             return $val;
+        }, $this);
+        return $res;
     }
 
     public function write($value) {
@@ -38,7 +45,7 @@ class Connected_Input_Output extends Volatile {
     }    
 }
 
-class Intcode_Runner extends Thread {
+class Intcode_Runner extends Worker {
     private $IO;
     private $Program;
     private $Is_Debug;
