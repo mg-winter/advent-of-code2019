@@ -17,9 +17,7 @@ function verify_image($arr, $height, $width) {
             $counts[$key] = isset($all_counts[$digit]) ? $all_counts[$digit] : 0;
          
         }
-
         return $counts;
-
     }, $chunks);
 
     $with_least_0s = array_reduce($chunks_by_count, function($cur_min, $item) {
@@ -35,9 +33,39 @@ function verify_image($arr, $height, $width) {
     return $with_least_0s;
 }
 
+function decode_image($arr, $height, $width) {
+    $digits_per_layer = $height * $width;
+    $chunks = array_chunk($arr, $digits_per_layer);
+    $final_layer = [];
+    for ($i = 0; $i < $digits_per_layer; $i++) {
+        $final_layer[$i] = 0;
+        foreach($chunks as $chunk) {
+            if ($chunk[$i] < 2) {
+                $final_layer[$i] = $chunk[$i];
+                break;
+            }
+        }
+    }
+
+    $hor_line = str_repeat('-', $width + 2);
+
+    /**Picking which characters represent which colours was the hardest part! */
+    return  $hor_line . PHP_EOL .  implode(PHP_EOL, array_map(function($row) {
+        $string_rep = array_map(function($item) {
+            return [' ', "\u{25A0}","\u{25A0}"][$item];
+        }, $row);
+        return '|' . implode('', $string_rep) . '|';
+    }, array_chunk($final_layer, $width))) . PHP_EOL . $hor_line;
+}
+
 function verify_image_from_file($path, $height, $width) {
     $str = file_get_contents($path);
     return verify_image(str_split($str), $height, $width);
+}
+
+function decode_image_from_file($path, $height, $width) {
+    $str = file_get_contents($path);
+    return decode_image(str_split($str), $height, $width);
 }
 
 ?>
