@@ -52,7 +52,7 @@ function decode_image($arr, $height, $width) {
     /**Picking which characters represent which colours was the hardest part! */
     return  $hor_line . PHP_EOL .  implode(PHP_EOL, array_map(function($row) {
         $string_rep = array_map(function($item) {
-            return [' ', "\u{25A0}","\u{25A0}"][$item];
+            return [" ", "\u{1F431}","\u{1F431}"][$item];
         }, $row);
         return '|' . implode('', $string_rep) . '|';
     }, array_chunk($final_layer, $width))) . PHP_EOL . $hor_line;
