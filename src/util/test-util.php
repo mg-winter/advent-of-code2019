@@ -5,7 +5,7 @@ require_once 'util.php';
         $res = call_user_func_array($func_to_test, $test['input']);
 
         return ['result' => $res, 
-                'pass' => $res === $test['result'],
+                'pass' => $res == $test['result'],
                 'test' => $test];
     }
 
