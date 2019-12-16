@@ -153,7 +153,7 @@ class Intcode_Computer {
         $output_offset = $this->set_value(1, $modes, $input_val);
 
         return ['next_index' => $this->Instruction_Pointer + 2, 'halt' => false, 
-        'desc' => 'saved ' . $input . ' into position ' . $output_index];
+        'desc' => 'saved ' . $input_val . ' into position ' . $output_offset];
     }
 
     function output($modes) {
