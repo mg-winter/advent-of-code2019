@@ -17,6 +17,7 @@ function wrap_to_length($pos, $arr) {
 class Painter implements Input, Output {
 
     static $DIRECTIONS = [[0,1],[1,0],[0,-1],[-1,0]];
+    static $PAINT_CHARS = [" ", "\u{1F431}"];
 
     private $Painted_Grid = [];
     private $Current_Coords = [0,0];
@@ -27,9 +28,13 @@ class Painter implements Input, Output {
     private $Program;
     private $Is_Debug;
 
-    public function __construct($program, $is_debug) {
+    private $X_Range = [0,0];
+    private $Y_Range = [0,0];
+
+    public function __construct($program, $is_debug, $initial_colour) {
         $this->Is_Debug = $is_debug;
         $this->Program = $program;
+        $this->Painted_Grid['0,0'] = $initial_colour;
     }
 
     public function get_colour($coords_str) {
@@ -48,6 +53,12 @@ class Painter implements Input, Output {
 
     public function paint($colour) {
         $this->Painted_Grid[implode(',', $this->Current_Coords)] = $colour;
+        $this->X_Range[0] = min($this->Current_Coords[0], $this->X_Range[0]);
+        $this->X_Range[1] = max($this->Current_Coords[0], $this->X_Range[1]);
+
+        $this->Y_Range[0] = min($this->Current_Coords[1], $this->Y_Range[0]);
+        $this->Y_Range[1] = max($this->Current_Coords[1], $this->Y_Range[1]);
+       
     }
 
     public function get_current_colour() {
@@ -86,10 +97,27 @@ class Painter implements Input, Output {
         $this->Computer = new Intcode_Computer($this->Program, $this, $this, $this->Is_Debug);
         $this->Computer->run();
     }
+
+    public function get_painted_str() {
+        $lines = [];
+        for ($i = $this->Y_Range[1]; $i >= $this->Y_Range[0]; $i--) {
+            $line = [];
+            for ($j = $this->X_Range[0]; $j <= $this->X_Range[1]; $j++) {
+                array_push($line, self::$PAINT_CHARS[$this->get_colour($j . ',' . $i)]);
+            }
+            array_push($lines, $line);
+        }
+        return implode(PHP_EOL, array_map(function($arr){return implode('', $arr);}, $lines));
+    }
 }
 
+function paint_identifier($program, $is_debug) {
+    $painter = new Painter($program, $is_debug, 1);
+    $painter->run();
+    return $painter->get_painted_str();
+}
 function get_panels_count($program,  $is_debug) {
-    $painter = new Painter($program, $is_debug);
+    $painter = new Painter($program, $is_debug, 0);
     $painter->run();
     return $painter->get_touched_panels_count();
 }
@@ -97,6 +125,11 @@ function get_panels_count($program,  $is_debug) {
 function get_panels_count_from_file($path, $is_debug) {
     $str = file_get_contents($path);
     return get_panels_count(explode(',', $str), $is_debug);
+}
+
+function paint_identifier_from_file($path, $is_debug) {
+    $str = file_get_contents($path);
+    return paint_identifier(explode(',', $str), $is_debug);
 }
 
 ?>
