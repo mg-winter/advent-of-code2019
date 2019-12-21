@@ -11,6 +11,15 @@ echo PHP_EOL;
 echo format_array(calculate_energy($input, 1000));
 echo PHP_EOL;
 
+echo 'Part 2';
+$start_time = time();
+echo PHP_EOL;
+echo format_array(calculate_steps_until_repeat($input));
+$end_time = time();
+
+echo PHP_EOL . 'Done in ' . ($end_time - $start_time) . 's';
+echo PHP_EOL;
+
 
 
 
