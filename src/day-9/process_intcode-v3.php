@@ -25,7 +25,7 @@ class Cached_Input implements Input {
 }
 
 class Cached_Output implements Output {
-    private $Storage = [];
+    protected $Storage = [];
 
 
     public function write($value) {
