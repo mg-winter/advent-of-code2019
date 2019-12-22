@@ -75,16 +75,18 @@ class Display_Output extends Array_Output {
             $this->Display_Grid[$y] = [];
         }
         
+        $this->Display_Grid[$y][$x] = self::$Tile_Key[$value];
         switch ($value) {
             case 3:
                 $this->Paddle_X = $x;
                 break;
             case 4: 
                 $this->Ball_Coords = [$x, $y];
+                $this->output_display();
                 break;
         }
-        $this->Display_Grid[$y][$x] = self::$Tile_Key[$value];
-        $this->output_display();
+       
+        
 
     }
 
@@ -96,6 +98,7 @@ class Display_Output extends Array_Output {
 
     public function set_score($value) {
         $this->Score = $value;
+        $this->output_display();
         echo PHP_EOL . 'Score: ' . $this->Score . PHP_EOL;
     }
     public function get_score() {
