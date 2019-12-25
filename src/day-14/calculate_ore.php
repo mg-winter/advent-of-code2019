@@ -2,11 +2,11 @@
 <?php
 require_once '../util/util.php';
 
-function update_component_counts($key, $num_required, $component_map, &$cur_counts) {
+function update_component_counts($key, $num_required, $component_map, &$cur_counts, &$leftovers) {
 
 
     $queue = [['key' => $key, 'amount' => $num_required]];
-    $leftovers = [];
+ 
     
     while(count($queue) > 0) {
         $cur_item = array_shift($queue);
@@ -46,21 +46,42 @@ function update_component_counts($key, $num_required, $component_map, &$cur_coun
 }
 
 
-function calculate_ore($initial_dict, $base, $target) {
+function calculate_ore($initial_dict, $base, $target, $amount_required, &$leftovers) {
     $direct_mappings = [];
     $direct_mappings[$base] = ['increment' => 1, 'base_value' => 1];
-    $leftovers = [];
     $required_counts = [];
-    update_component_counts($target, 1, $initial_dict, $required_counts);
+    update_component_counts($target, $amount_required, $initial_dict, $required_counts, $leftovers);
     return $required_counts[$base];
 }
 
+function calculate_fuel($initial_dict, $base, $target, $target_amount) {
+    $leftovers_draft = [];
+    $min_ore =  calculate_ore($initial_dict, $base, $target, 1, $leftovers_draft);
+    $ore_available = $target_amount;
+    $res = 0;
+
+
+    $leftovers = [];
+    while (true) {
+        $approx_fuel = max(1, intdiv($ore_available, $min_ore)); //account for leftovers
+       
+       
+        $ore_needed = calculate_ore($initial_dict,  $base, $target, $approx_fuel, $leftovers);
+    
+        $ore_available -= $ore_needed;
+        if ($ore_available >= 0) {
+             $res += $approx_fuel;
+        } else {
+            return $res;
+        }
+    }
+}
 
 function process_chem_quantity($str) {
     return array_map('trim', explode(' ', trim($str)));
 }
 
-function calculate_ore_from_file($path, $base, $target) {
+function parse_fuel_file($path) {
     $str = file_get_contents($path);
     $lines = explode(PHP_EOL, $str);
     $res_dict = [];
@@ -77,8 +98,19 @@ function calculate_ore_from_file($path, $base, $target) {
         }
         $res_dict[$split_target[1]] = ['increment' => $split_target[0],  'components' => $component_map];
     }
-  
-    return calculate_ore($res_dict, $base, $target);
+    return $res_dict;
+}
+
+function calculate_ore_from_file($path, $base, $target) {
+    
+    $res_dict = parse_fuel_file($path);
+    $leftovers = [];
+    return calculate_ore($res_dict, $base, $target, 1, $leftovers);
+}
+
+function calculate_fuel_from_file($path, $base, $target, $target_amount) {
+    $res_dict = parse_fuel_file($path);
+    return calculate_fuel($res_dict, $base, $target, $target_amount);
 }
 
 ?>
