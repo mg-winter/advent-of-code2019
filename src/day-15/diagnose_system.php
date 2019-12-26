@@ -65,14 +65,13 @@ class Diagnostic_Robot extends Array_Output implements Input {
                 $this->Coord_Directions[$key] = self::reverse($this->Last_Direction_Index);
             }
         }
-
-       
         
         if ($this->System_Location != null && $updated_coords == [0,0]) {
             $this->output_display([]);
             echo PHP_EOL . ' returned to base. System is at ' . format_array($this->System_Location) . PHP_EOL; 
             $points = [];
-            echo 'Shortest path to system is ' . $this->get_shortest_route_length($this->System_Location, [0,0], -1, $points) . PHP_EOL;
+            echo 'Shortest path to system is ' . $this->get_shortest_route_length($this->System_Location, [0,0])['steps'] . PHP_EOL;
+            echo 'Time to fill is ' . $this->get_shortest_route_length($this->System_Location, [$this->Boundaries[0][0] - 1, $this->Boundaries[1][0] - 1])['steps'] . PHP_EOL;
             exit();
         } else {
             if ($value === 2) {
@@ -84,7 +83,7 @@ class Diagnostic_Robot extends Array_Output implements Input {
 
     }
 
-    protected function get_shortest_route_length($coords, $target, $prev_dir, $path) {
+    protected function get_shortest_route_length($coords, $target) {
 
         /**Path-finding:
          * 
@@ -100,40 +99,53 @@ class Diagnostic_Robot extends Array_Output implements Input {
         $key = implode(',', $coords);
         $init_path = [];
         $init_path[$key] = true;
-        $partial_paths = [['coords' => $coords, 'path' => []]];
+        $partial_paths = [['coords' => $coords, 'path' => $init_path]];
 
         $directions = array_keys(self::$Directions);
         for ($i = 0; $i <= PHP_INT_MAX; $i++) {
            
+           
             $new_paths = [];
             foreach ($partial_paths as $partial_path) {
                 if ($partial_path['coords'] == $target) {
-                    return $i;
+                    return ['success' => true, 'steps' => $i];
                 } else {
                     $coords =  $partial_path['coords'];
                     $subpath_key = implode(',', $coords);
-                    if ($this->Known_Coords[$subpath_key] != 0 && !isset($partial_path['path'][$subpath_key])) {
-                        $path_keys = array_keys($partial_path['path']);
-                        $new_path = [];
-                        foreach ($path_keys as $path_key) {
-                            $new_path[$path_key] = true;
-                        }
+                   
+                       
                         $new_path[$subpath_key] = $i;
                         foreach ($directions as $dir) {
                             $new_coords = self::apply_direction($coords, $dir);
-                            array_push($new_paths, ['coords' => $new_coords, 'path' => $new_path]);
+                            $new_key = implode(',', $new_coords);
+
+                            if ($this->Known_Coords[$new_key] != 0 && !isset($partial_path['path'][$new_key])) {
+                                $path_keys = array_keys($partial_path['path']);
+                                $new_path = [];
+                                foreach ($path_keys as $path_key) {
+                                    $new_path[$path_key] = true;
+                                 }
+                                $new_path[$new_key] = true;
+                                array_push($new_paths, ['coords' => $new_coords, 'path' => $new_path]);
+                            }
                         }
-                    }
+                    
                 }
             }
-            $partial_paths = $new_paths;
+            
+             if (count($new_paths) == 0) {
+                return ['success' => false, 'steps' => $i];
+            } else {
+                $partial_paths = $new_paths;
+            }
         }
 
-        return -1;       
+        return ['success' => false, 'steps' => -1];      
     }
 
     protected function update_direction() {
        
+        /**Spiral-ish exploration path */
         $dirs = [self::clockwise($this->Last_Direction_Index), $this->Last_Direction_Index, self::counter_clockwise($this->Last_Direction_Index), self::reverse($this->Last_Direction_Index)];
      
         foreach ($dirs as $cur_dir) {
@@ -183,15 +195,13 @@ class Diagnostic_Robot extends Array_Output implements Input {
 
     function update_boundaries($coords) {
   
-        // echo PHP_EOL . "Before "  . format_array($this->Boundaries) . ', ';
-        // echo "Change "  . format_array($coords) . ', ';
+      
      
         $this->Boundaries[0][0] = min($this->Boundaries[0][0], $coords[0]);
         $this->Boundaries[0][1] = max($this->Boundaries[0][1], $coords[0]);
         $this->Boundaries[1][0] = min($this->Boundaries[1][0], $coords[1]);
         $this->Boundaries[1][1] = max($this->Boundaries[1][1], $coords[1]);
-        //echo "Result " . format_array($this->Boundaries) . PHP_EOL;
-    
+       
     }
 
     public function output_display($path) {
