@@ -40,6 +40,20 @@
         }
     }
 
+    function wrap_to_length($pos, $arr) {
+        $count = count($arr);
+      if ($pos < 0) {
+            return wrap_to_length($count + $pos, $arr);
+        } else if ($pos >= $count) {
+            $mod = $pos % $count;
+            return $mod;
+            return ;
+        } else {
+            return $pos;
+        }
+
+}
+
 
 
 ?>
